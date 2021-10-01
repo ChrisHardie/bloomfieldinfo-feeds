@@ -8,8 +8,11 @@ use ChrisHardie\Feedmaker\Sources\RssItemCollection;
 use ChrisHardie\Feedmaker\Models\Source;
 use Illuminate\Cookie\CookieJar;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\HttpClient\HttpClient;
 
 class NjPublicNotices extends BaseSource
 {
@@ -18,129 +21,71 @@ class NjPublicNotices extends BaseSource
      */
     public function generateRssItems(Source $source): RssItemCollection
     {
-        // For the initial request, we use a Goutte/Browserkit client because we will need to parse out the Viewstate info.
-        $client = new \Goutte\Client();
-        $crawler = $client->request('GET', 'https://www.njpublicnotices.com/Search.aspx');
+        $user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15';
 
-        $viewstateData = $this->getViewstate($crawler);
-
-        // Now that we have the Viewstate data, we build a new HTTP/Guzzle client because the second request
-        // is for a special partial HTML chunk that won't be parsable as a DOM.
-        $countyPostData = [
-            'MIME Type' => 'application/x-www-form-urlencoded; charset=utf-8',
-            'ctl00$ToolkitScriptManager1'
-                => 'ctl00$ContentPlaceHolder1$as1$upSearch|ctl00$ContentPlaceHolder1$as1$lstCounty$6',
-            'ctl00$ContentPlaceHolder1$as1$hdnLastScrollPos' => '103',
-            'ctl00$ContentPlaceHolder1$as1$hdnCountyScrollPosition' => '-1',
-            '__EVENTTARGET' => 'ctl00$ContentPlaceHolder1$as1$lstCounty$6',
-            '__ASYNCPOST' => 'true',
-            '__LASTFOCUS' => '',
-        ];
-
-        $postData = array_merge($countyPostData, $viewstateData, self::getStaticFormFields());
-
-        $response = Http::asForm()
-            ->withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15')
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'X-MicrosoftAjax' => 'Delta=true',
-                'Origin' => 'https://www.njpublicnotices.com',
-            ])
-            ->post('https://www.njpublicnotices.com/Search.aspx', $postData);
-
-        // In the result of this request, we want to get the new ViewState info.
-        $viewstateData2 = $this->parseViewstate($response->body());
-
-        $searchPostData = array(
-            'ctl00$ToolkitScriptManager1' => 'ctl00$ContentPlaceHolder1$as1$upSearch|ctl00$ContentPlaceHolder1$as1$btnGo',
-            'ctl00$ContentPlaceHolder1$as1$hdnLastScrollPos' => '103',
-            'ctl00$ContentPlaceHolder1$as1$hdnCountyScrollPosition' => '#ctl00_ContentPlaceHolder1_as1_lstCounty_6',
-            'ctl00$ContentPlaceHolder1$as1$btnGo' => '',
-            '__EVENTTARGET' => '',
-            '__EVENTARGUMENT' => '',
-            '__ASYNCPOST' => true,
-            '__LASTFOCUS' => '',
-        );
-
-        $postData2 = array_merge($searchPostData, $viewstateData2, self::getStaticFormFields());
-
-        $response2 = Http::asForm()
-            ->withoutRedirecting()
-            ->withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15')
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'X-MicrosoftAjax' => 'Delta=true',
-                'Origin' => 'https://www.njpublicnotices.com',
+        $client = new \Goutte\Client(HttpClient::create(array(
+            'headers' => array(
+                'user-agent' => $user_agent,
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language' => 'en-US,en;q=0.5',
                 'Referer' => 'https://www.njpublicnotices.com/Search.aspx',
-                'dnt' => 1,
-            ])
-            ->post('https://www.njpublicnotices.com/Search.aspx', $postData2);
+            ),
+        )));
+        $client->setServerParameter('HTTP_USER_AGENT', $user_agent);
 
+        $crawler = $client->request('GET', 'https://www.njpublicnotices.com/authenticate.aspx');
 
-        $noticeNodes = $crawler->filter('.wsResultsGrid tbody td');
-
-        echo "Found " . $noticeNodes->count() . ' nodes.';
-
-        dd($noticeNodes->eq(0)->html());
-
-//        $crawler->submit()
-//
-//        $county_client = new Client();
-//        $county_client->request('POST', $source->source_url, )
-
-
-//        $items = array();
-//        $nodes = $crawler->filter( '.news-items' );
-//        foreach ( $nodes as $node ) {
-//            ...
-//        }
-
-//        return RssItemCollection::make( $items );
-    }
-
-    private function getViewstate(Crawler $crawler): array
-    {
-        $viewstate_array = array();
-        $viewstate_array['__VIEWSTATE'] = $crawler->filter('#__VIEWSTATE')->attr('value');
-        $viewstate_array['__VIEWSTATEGENERATOR'] = $crawler->filter('#__VIEWSTATEGENERATOR')->attr('value');
-        return $viewstate_array;
-    }
-
-    private function parseViewstate(string $html): array
-    {
-        // TODO error checking
-        // hiddenField|__VIEWSTATE|...|hiddenField|__VIEWSTATEGENERATOR|...|
-        preg_match(
-            '/.*hiddenField\|__VIEWSTATE\|(\S+)\|hiddenField\|__VIEWSTATEGENERATOR\|([a-zA-Z0-9]+)\|.*$/',
-            $html,
-            $matches,
+        $form = $crawler->selectButton('Login')->form();
+        $crawler = $client->submit(
+            $form,
+            array(
+                'ctl00$ContentPlaceHolder1$AuthenticateIPA1$txtEmailAddress'
+                    => config('bloomfieldfeeds.source_auth.njpublicnotices_username'),
+                'ctl00$ContentPlaceHolder1$AuthenticateIPA1$txtPassword'
+                    => config('bloomfieldfeeds.source_auth.njpublicnotices_password'),
+            )
         );
 
-        return [
-            '__VIEWSTATE' => $matches[1],
-            '__VIEWSTATEGENERATOR' => $matches[2],
-        ];
-    }
+        // Todo check result
 
-    private static function getStaticFormFields()
-    {
-        return array(
-            'ctl00_ToolkitScriptManager1_HiddenField' => '',
-            'ctl00$ContentPlaceHolder1$as1$ddlPopularSearches' => '0',
-            'ctl00$ContentPlaceHolder1$as1$txtSearch' => '',
-            'ctl00$ContentPlaceHolder1$as1$rdoType' => 'AND',
-            'ctl00$ContentPlaceHolder1$as1$txtExclude' => '',
-            'ctl00$ContentPlaceHolder1$as1$hdnCityScrollPosition' => '-1',
-            'ctl00$ContentPlaceHolder1$as1$hdnPubScrollPosition' => '-1',
-            'ctl00$ContentPlaceHolder1$as1$hdnField' => '',
-            'ctl00$ContentPlaceHolder1$as1$lstCounty$6' => 'on',
-            'ctl00$ContentPlaceHolder1$as1$dateRange' => 'rbLastNumDays',
-            'ctl00$ContentPlaceHolder1$as1$txtLastNumDays' => '60',
-            'ctl00$ContentPlaceHolder1$as1$txtLastNumWeeks' => '52',
-            'ctl00$ContentPlaceHolder1$as1$txtLastNumMonths' => '12',
-            'ctl00$ContentPlaceHolder1$as1$txtDateFrom' => '9/13/2021',
-            'ctl00$ContentPlaceHolder1$as1$txtDateTo' => '9/27/2021',
-            'ctl00$ContentPlaceHolder1$as1$txtSSID' => '0',
-        );
+        $crawler = $client->request('GET', 'https://www.njpublicnotices.com/Search.aspx?SSID=8028');
+
+        $items = array();
+
+        $nodes = $crawler->filter('.wsResultsGrid tr');
+
+        foreach ($nodes as $node) {
+            $row = new Crawler($node);
+
+            // See if we can fetch the table row that has the notice ID and date
+            $link_row = $row->filterXPath('//td//table[@class="nested"]//tr')->first();
+            if (! $link_row->count()) {
+                continue;
+            }
+
+            // Get the notice ID and Date out
+            $notice_id = $link_row->filterXPath('//td//input[contains(@name, "hdnPKValue")]')->attr('value');
+            $pub_date = $link_row->filterXPath('//td')->last()->filterXpath('//div[@class="left"]//span')->text();
+            $pub_date = preg_replace('/Posted: /', '', $pub_date);
+
+            if (! empty($notice_id)) {
+                $url = 'https://www.njpublicnotices.com/Details.aspx?ID=' . $notice_id;
+            } else {
+                $url = 'https://www.njpublicnotices.com/Search.aspx#searchResults';
+            }
+
+            // Get the row that has the description/title
+            $description_row = $row->filterXPath('//td//table[@class="nested"]//tr')->last();
+            $description = $description_row->filter('td')->text('No description available');
+
+            $items[] = array(
+                'title' => Str::limit($description, 55),
+                'description' => $description,
+                'pubDate' => Carbon::createFromFormat('!m/d/Y', $pub_date, 'America/New_York'),
+                'url' => $url,
+            );
+        }
+
+        return RssItemCollection::make( $items );
     }
 }

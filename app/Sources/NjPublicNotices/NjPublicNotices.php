@@ -6,10 +6,9 @@ use ChrisHardie\Feedmaker\Exceptions\SourceNotCrawlable;
 use ChrisHardie\Feedmaker\Sources\BaseSource;
 use ChrisHardie\Feedmaker\Sources\RssItemCollection;
 use ChrisHardie\Feedmaker\Models\Source;
-use Illuminate\Cookie\CookieJar;
-use Illuminate\Support\Arr;
+use Goutte\Client;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpClient\HttpClient;
@@ -22,18 +21,24 @@ class NjPublicNotices extends BaseSource
     public function generateRssItems(Source $source): RssItemCollection
     {
         $user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15';
+        $base_url = 'https://www.njpublicnotices.com';
 
-        $client = new \Goutte\Client(HttpClient::create(array(
+        $client = new Client(HttpClient::create(array(
             'headers' => array(
                 'user-agent' => $user_agent,
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                 'Accept-Language' => 'en-US,en;q=0.5',
-                'Referer' => 'https://www.njpublicnotices.com/Search.aspx',
+                'Referer' => $base_url . '/Search.aspx',
             ),
         )));
         $client->setServerParameter('HTTP_USER_AGENT', $user_agent);
 
-        $crawler = $client->request('GET', 'https://www.njpublicnotices.com/authenticate.aspx');
+        $crawler = $client->request('GET', $base_url . '/authenticate.aspx');
+
+        $response = $client->getInternalResponse();
+        if (200 !== $response->getStatusCode()) {
+            throw new SourceNotCrawlable('Cannot get login form', 0, null, $source);
+        }
 
         $form = $crawler->selectButton('Login')->form();
         $crawler = $client->submit(
@@ -46,14 +51,25 @@ class NjPublicNotices extends BaseSource
             )
         );
 
-        // Todo check result
+        $response = $client->getInternalResponse();
+        if (200 !== $response->getStatusCode()) {
+            throw new SourceNotCrawlable('Cannot login', 0, null, $source);
+        }
 
-        $crawler = $client->request('GET', 'https://www.njpublicnotices.com/Search.aspx?SSID=8028');
+        $crawler = $client->request('GET', $base_url .'/Search.aspx?SSID=8028');
 
-        $items = array();
+        $response = $client->getInternalResponse();
+        if (200 !== $response->getStatusCode()) {
+            throw new SourceNotCrawlable('Cannot get saved search', 0, null, $source);
+        }
 
         $nodes = $crawler->filter('.wsResultsGrid tr');
 
+        if (0 === $nodes->count()) {
+            throw new SourceNotCrawlable('No public notice results', 0, null, $source);
+        }
+
+        $items = array();
         foreach ($nodes as $node) {
             $row = new Crawler($node);
 
@@ -69,9 +85,10 @@ class NjPublicNotices extends BaseSource
             $pub_date = preg_replace('/Posted: /', '', $pub_date);
 
             if (! empty($notice_id)) {
-                $url = 'https://www.njpublicnotices.com/Details.aspx?ID=' . $notice_id;
+                $url = $base_url . '/Details.aspx?ID=' . $notice_id;
             } else {
-                $url = 'https://www.njpublicnotices.com/Search.aspx#searchResults';
+                Log::debug('Cannot find notice ID on NJ Public Notice parsing');
+                $url = $base_url .'/Search.aspx#searchResults';
             }
 
             // Get the row that has the description/title
@@ -86,6 +103,6 @@ class NjPublicNotices extends BaseSource
             );
         }
 
-        return RssItemCollection::make( $items );
+        return RssItemCollection::make($items);
     }
 }

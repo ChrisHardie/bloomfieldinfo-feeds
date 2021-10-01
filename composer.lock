@@ -124,16 +124,16 @@
         },
         {
             "name": "chrishardie/laravel-feedmaker",
-            "version": "v1.0.1",
+            "version": "v1.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/ChrisHardie/laravel-feedmaker.git",
-                "reference": "bfbdf509fa4d36ee78fbe30ebc12088021f928ce"
+                "reference": "2dedbcbaa9f9b983e93f5ed0f5036b7f3c030673"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ChrisHardie/laravel-feedmaker/zipball/bfbdf509fa4d36ee78fbe30ebc12088021f928ce",
-                "reference": "bfbdf509fa4d36ee78fbe30ebc12088021f928ce",
+                "url": "https://api.github.com/repos/ChrisHardie/laravel-feedmaker/zipball/2dedbcbaa9f9b983e93f5ed0f5036b7f3c030673",
+                "reference": "2dedbcbaa9f9b983e93f5ed0f5036b7f3c030673",
                 "shasum": ""
             },
             "require": {
@@ -190,7 +190,7 @@
             ],
             "support": {
                 "issues": "https://github.com/ChrisHardie/laravel-feedmaker/issues",
-                "source": "https://github.com/ChrisHardie/laravel-feedmaker/tree/v1.0.1"
+                "source": "https://github.com/ChrisHardie/laravel-feedmaker/tree/v1.0.3"
             },
             "funding": [
                 {
@@ -198,7 +198,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2021-10-01T18:15:06+00:00"
+            "time": "2021-10-01T18:39:38+00:00"
         },
         {
             "name": "dflydev/dot-access-data",

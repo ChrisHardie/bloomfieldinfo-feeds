@@ -7,6 +7,7 @@ use ChrisHardie\Feedmaker\Sources\BaseSource;
 use ChrisHardie\Feedmaker\Sources\RssItemCollection;
 use ChrisHardie\Feedmaker\Models\Source;
 use Goutte\Client;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -56,6 +57,9 @@ class NjPublicNotices extends BaseSource
             throw new SourceNotCrawlable('Cannot login', 0, null, $source);
         }
 
+        $jar = $client->getCookieJar();
+        $session_id = $jar->get('ASP.NET_SessionId')->getValue();
+
         $crawler = $client->request('GET', $base_url .'/Search.aspx?SSID=8028');
 
         $response = $client->getInternalResponse();
@@ -84,8 +88,8 @@ class NjPublicNotices extends BaseSource
             $pub_date = $link_row->filterXPath('//td')->last()->filterXpath('//div[@class="left"]//span')->text();
             $pub_date = preg_replace('/Posted: /', '', $pub_date);
 
-            if (! empty($notice_id)) {
-                $url = $base_url . '/Details.aspx?ID=' . $notice_id;
+            if (! empty($notice_id) && ! empty($session_id)) {
+                $url = $base_url . '/Details.aspx?' . Arr::query(['ID' => $notice_id, 'SID' => $session_id ]);
             } else {
                 Log::debug('Cannot find notice ID on NJ Public Notice parsing');
                 $url = $base_url .'/Search.aspx#searchResults';

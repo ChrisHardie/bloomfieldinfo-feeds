@@ -18,7 +18,6 @@ class NjcomEssex extends BaseSource
     public function generateRssItems(Source $source): RssItemCollection
     {
         $params = array(
-            'd' => 644,
             '_website' => 'nj',
             'query' => '{"limit":12,"offset":0,"section":"essex"}',
         );

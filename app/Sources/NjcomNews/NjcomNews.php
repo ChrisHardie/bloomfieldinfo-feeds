@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Sources\NjcomEssex;
+namespace App\Sources\NjcomNews;
 
 use ChrisHardie\Feedmaker\Exceptions\SourceNotCrawlable;
 use ChrisHardie\Feedmaker\Sources\BaseSource;
@@ -9,7 +9,7 @@ use ChrisHardie\Feedmaker\Models\Source;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 
-class NjcomEssex extends BaseSource
+class NjcomNews extends BaseSource
 {
     /**
      * @throws SourceNotCrawlable
@@ -18,7 +18,7 @@ class NjcomEssex extends BaseSource
     {
         $params = array(
             '_website' => 'nj',
-            'query' => '{"limit":12,"offset":0,"section":"essex"}',
+            'query' => '{"limit":12,"offset":0,"section":"news"}',
         );
 
         $query_url = $source->source_url . '?' . Arr::query($params);
@@ -56,7 +56,7 @@ class NjcomEssex extends BaseSource
         }
 
         if (0 < $items) {
-                return RssItemCollection::make($items);
+            return RssItemCollection::make($items);
         }
         throw new SourceNotCrawlable('No news stories', 0, null, $source);
     }

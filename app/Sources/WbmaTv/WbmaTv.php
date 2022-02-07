@@ -41,8 +41,10 @@ class WbmaTv extends BaseSource
                         'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15', // phpcs:ignore
                         'Connect-Preshared-Key' => config('bloomfieldfeeds.source_misc.wbmatv_preshared_key'),
                     ])
-                    ->get($playlistUrl);
-                $this->reportResultsToArray($response->json(), $source);
+                    ->get($playlistUrl)
+                    ->throw()
+                    ->json();
+                $this->reportResultsToArray($response, $source);
             } catch (\Exception $e) {
                 throw new SourceNotCrawlable(
                     'Problem parsing source JSON',

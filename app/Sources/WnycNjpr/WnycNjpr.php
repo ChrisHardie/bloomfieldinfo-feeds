@@ -17,7 +17,18 @@ class WnycNjpr extends BaseSource
     {
         try {
             $report_response = $this->getUrl($source, $source->source_url);
-            return $this->apiResultsToRssItems($report_response->json(), $source);
+            if ($report_response && $report_response->successful()) {
+                $json = $report_response->json();
+                if ($json) {
+                    return $this->apiResultsToRssItems($json, $source);
+                }
+            }
+            throw new SourceNotCrawlable(
+                'No JSON in response',
+                0,
+                null,
+                $source
+            );
         } catch (\Exception $e) {
             throw new SourceNotCrawlable(
                 'Problem parsing source HTML',

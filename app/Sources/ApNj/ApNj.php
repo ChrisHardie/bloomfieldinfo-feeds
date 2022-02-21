@@ -27,7 +27,7 @@ class ApNj extends BaseSource
             $items[] = array(
                 'title' => $item->filter('.CardHeadline h3')->text(),
                 'url' => $this->resolveUrl($source, $item->filter('a')->attr('href')),
-                'description' => $item->filter('a .content p')->text(),
+                'description' => $item->filter('a .content p')->text(''),
                 'pubDate' => Carbon::create($item->filter('.CardHeadline div .Timestamp')->attr('data-source'))
             );
         }

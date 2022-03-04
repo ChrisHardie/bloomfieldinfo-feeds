@@ -25,7 +25,7 @@ class ApNj extends BaseSource
         foreach ($nodes as $node) {
             $item = new Crawler($node);
             $items[] = array(
-                'title' => $item->filter('.CardHeadline h3')->text(),
+                'title' => $item->filter('.CardHeadline h2')->text(),
                 'url' => $this->resolveUrl($source, $item->filter('a')->attr('href')),
                 'description' => $item->filter('a .content p')->text(''),
                 'pubDate' => Carbon::create($item->filter('.CardHeadline div .Timestamp')->attr('data-source'))

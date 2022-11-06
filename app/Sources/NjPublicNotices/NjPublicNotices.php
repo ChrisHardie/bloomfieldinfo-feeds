@@ -41,6 +41,11 @@ class NjPublicNotices extends BaseSource
             throw new SourceNotCrawlable('Cannot get login form', 0, null, $source);
         }
 
+        // The site now embeds a session ID in the URL. Extract it and start using it.
+        $redirected_uri_with_session = $crawler->getUri();
+        $url_session_id = Str::between($redirected_uri_with_session, $base_url . '/', '/authenticate.aspx');
+        $base_url_with_session = $base_url . '/' . $url_session_id;
+
         $form = $crawler->selectButton('Login')->form();
         $crawler = $client->submit(
             $form,
@@ -58,11 +63,11 @@ class NjPublicNotices extends BaseSource
         }
 
         $jar = $client->getCookieJar();
-        $session_id = $jar->get('ASP.NET_SessionId')->getValue();
+        $session_id = $jar->get('.ASPXAUTH')->getValue();
 
         $crawler = $client->request(
             'GET',
-            $base_url .'/Search.aspx?' . Arr::query(
+            $base_url_with_session .'/Search.aspx?' . Arr::query(
                 ['SSID' => config('bloomfieldfeeds.source_misc.njpublicnotices_actual_search_id')]
             )
         );
